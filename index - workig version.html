@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Watch Checker</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --text: #111111;
+    --muted: #6b7280;
+    --card: #fafafa;
+    --border: #e5e7eb;
+    --accent: #c8a96a; /* soft gold */
+    --good: #10b981;
+    --bad: #ef4444;
+  }
+  [data-theme="dark"] {
+    --bg: #0d0d0d;
+    --text: #f9fafb;
+    --muted: #9ca3af;
+    --card: #161616;
+    --border: #262626;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--text);
+  }
+  .wrap{max-width:780px;margin:0 auto;padding:24px}
+  header{
+    display:flex;align-items:center;justify-content:space-between;margin:8px 0 24px 0
+  }
+  .brand{font-weight:700;letter-spacing:.2px}
+  .tabs{display:flex;gap:8px}
+  .tab-btn{
+    padding:10px 14px;border:1px solid var(--border);background:var(--card);
+    border-radius:12px;cursor:pointer;font-weight:600;color:var(--text)
+  }
+  .tab-btn.active{border-color:var(--accent)}
+  .theme-toggle{
+    border:1px solid var(--border);background:var(--card);padding:10px 12px;border-radius:12px;cursor:pointer
+  }
+  .card{
+    background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;margin:12px 0
+  }
+  .title{font-size:28px;font-weight:700;margin:4px 0 8px 0}
+  .subtitle{color:var(--muted);margin:0 0 12px 0}
+  label{display:block;font-weight:600;margin:12px 0 6px 0}
+  input[type="text"],input[type="number"]{
+    width:100%;padding:14px 16px;border:1px solid var(--border);
+    background:transparent;color:var(--text);border-radius:12px;font-size:16px
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button{ -webkit-appearance: none; margin: 0; }
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--border);
+    background:var(--accent);color:white;font-weight:700;cursor:pointer
+  }
+  .btn.ghost{background:transparent;color:var(--text)}
+  .result{
+    display:flex;align-items:center;gap:12px;font-weight:700
+  }
+  .badge{
+    display:inline-block;padding:8px 12px;border-radius:999px;border:1px solid var(--border);
+    background:var(--card);font-weight:700
+  }
+  .badge.good{border-color:rgba(16,185,129,.35);color:var(--good)}
+  .badge.bad{border-color:rgba(239,68,68,.35);color:var(--bad)}
+  .list{display:grid;gap:10px}
+  .list .item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px dashed var(--border)}
+  .muted{color:var(--muted)}
+  .hidden{display:none}
+  footer{margin:24px 0;color:var(--muted);font-size:14px;text-align:center}
+  canvas#confetti{position:fixed;inset:0;pointer-events:none}
+</style>
+</head>
+<body data-theme="light">
+<canvas id="confetti"></canvas>
+<div class="wrap">
+  <header>
+    <div class="brand">Watch Checker</div>
+    <div class="row">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="check">Check</button>
+        <button class="tab-btn" data-tab="learn">Learn</button>
+      </div>
+      <button id="themeToggle" class="theme-toggle" title="Toggle theme">☀️</button>
+    </div>
+  </header>
+
+  <!-- CHECK TAB -->
+  <section id="tab-check">
+    <div class="card">
+      <div class="title">Enter your reference</div>
+      <p class="subtitle">Type your watch reference number and we’ll guess the brand & model.</p>
+      <label for="refInput">Reference number</label>
+      <input id="refInput" type="text" placeholder="e.g., 16220" autocomplete="off" />
+      <div class="row" style="margin-top:12px">
+        <button id="startGuess" class="btn">Check my watch</button>
+        <button id="clearAll" class="btn ghost">Clear</button>
+      </div>
+    </div>
+
+    <div id="guessCard" class="card hidden">
+      <div id="guessText" class="title" style="font-size:22px"></div>
+      <p class="muted" id="guessMeta"></p>
+      <div class="row">
+        <button id="guessYes" class="btn">Yes</button>
+        <button id="guessNo" class="btn ghost">No, try next</button>
+      </div>
+    </div>
+
+    <div id="yearCard" class="card hidden">
+      <div class="title" style="font-size:22px">What year was it made (roughly)?</div>
+      <p class="muted">An estimate is fine — this helps us check service timing.</p>
+      <label for="yearInput">Year</label>
+      <input id="yearInput" type="number" inputmode="numeric" placeholder="e.g., 2001" />
+      <div class="row" style="margin-top:12px">
+        <button id="yearNext" class="btn">Continue</button>
+      </div>
+    </div>
+
+    <div id="resultCard" class="card hidden">
+      <div class="result">
+        <span id="resultBadge" class="badge">Result</span>
+        <span id="resultTitle" class="title" style="font-size:22px;margin:0"></span>
+      </div>
+      <p id="resultDesc" class="subtitle" style="margin-top:8px"></p>
+      <div class="list" style="margin-top:8px">
+        <div class="item"><span>Model</span><span id="outModel" class="muted"></span></div>
+        <div class="item"><span>Movement</span><span id="outMovement" class="muted"></span></div>
+        <div class="item"><span>Estimated age</span><span id="outAge" class="muted"></span></div>
+        <div class="item"><span>Typical service interval</span><span id="outInterval" class="muted"></span></div>
+        <div class="item"><span>Certification</span><span id="outCert" class="muted"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- LEARN TAB -->
+  <section id="tab-learn" class="hidden">
+    <div class="card">
+      <div class="title">Movement types — quick guide</div>
+      <div class="list">
+        <div class="item"><span><strong>Manual</strong></span><span class="muted">Hand-wound; typical tolerance varies, ~±10–30 s/day.</span></div>
+        <div class="item"><span><strong>Automatic</strong></span><span class="muted">Self-winding mechanical; common spec ~±10–20 s/day unless certified.</span></div>
+        <div class="item"><span><strong>Quartz</strong></span><span class="muted">Battery; ~±15 s/month (≈±0.5 s/day).</span></div>
+        <div class="item"><span><strong>Superquartz / HAQ</strong></span><span class="muted">Thermo‑compensated; ~±3–10 s/year.</span></div>
+        <div class="item"><span><strong>Spring Drive</strong></span><span class="muted">Hybrid GS tech; ~±15 s/month (≈±0.5 s/day).</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title">Certifications — what “within range” means</div>
+      <div class="list">
+        <div class="item"><span><strong>COSC (Mech)</strong></span><span class="muted">~−4 to +6 s/day (lab conditions).</span></div>
+        <div class="item"><span><strong>METAS / Master Chronometer</strong></span><span class="muted">As‑worn average near 0 s/day (small + allowed).</span></div>
+        <div class="item"><span><strong>Rolex Superlative</strong></span><span class="muted">~−2 to +2 s/day (post‑COSC adjustment).</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title">Why service matters</div>
+      <p class="subtitle">
+        Oils dry, seals age, parts wear. Regular service keeps accuracy, water‑resistance, and longevity in check.
+        If your watch is past its typical service interval or behaving oddly (big daily gains/losses, low power reserve, magnetized),
+        have a watchmaker inspect it.
+      </p>
+    </div>
+  </section>
+
+  <footer>© <span id="yearNow"></span> Watch Checker • Pure & minimal</footer>
+</div>
+
+<script>
+  // ====== SAMPLE DATA ======
+  const CERTS = {
+    cert_rolex_superlative: { name: "Rolex Superlative Chronometer", range: "≈ −2 to +2 s/day"},
+    cert_metas_mc: { name: "METAS / Master Chronometer", range: "as-worn ~0 s/day (small + allowed)"},
+    cert_cosc_mech: { name: "COSC (Mechanical)", range: "≈ −4 to +6 s/day"},
+    cert_std_mech: { name: "Standard Mechanical", range: "≈ −20 to +20 s/day"},
+    cert_std_quartz: { name: "Standard Quartz", range: "≈ ±15 s/month"},
+    cert_haq_quartz: { name: "HAQ / Superquartz", range: "≈ ±3–10 s/year"},
+    cert_spring_drive: { name: "Spring Drive", range: "≈ ±15 s/month"},
+  };
+
+  const REFERENCES = [
+    ["ref_rolex_16220","Rolex","16220","Datejust 36",1988,2005,"Cal. 3135 (Auto)",10,"cert_rolex_superlative"],
+    ["ref_rolex_124270","Rolex","124270","Explorer 36",2021,null,"Cal. 3230 (Auto)",10,"cert_rolex_superlative"],
+    ["ref_omega_21030422003001","Omega","210.30.42.20.03.001","Seamaster Diver 300M",2018,null,"Cal. 8800 (Auto)",8,"cert_metas_mc"],
+    ["ref_omega_23330412101001","Omega","233.30.41.21.01.001","Seamaster 300",2014,2021,"Cal. 8400 (Auto)",8,"cert_metas_mc"],
+    ["ref_tudor_m79030n","Tudor","M79030N","Black Bay 58",2018,null,"MT5402 (Auto)",10,"cert_cosc_mech"],
+    ["ref_breitling_ab012012","Breitling","AB012012","Navitimer 01",2011,2018,"B01 (Auto)",8,"cert_cosc_mech"],
+    ["ref_cartier_wssa0017","Cartier","WSSA0017","Santos Large",2018,null,"1847MC (Auto)",8,"cert_std_mech"],
+    ["ref_seiko_srpe55","Seiko","SRPE55","Seiko 5 Sports",2019,null,"4R36 (Auto)",6,"cert_std_mech"],
+    ["ref_grandseiko_sbga211","Grand Seiko","SBGA211","Snowflake",2010,null,"9R65 (Spring Drive)",8,"cert_spring_drive"],
+    ["ref_tag_waz1110","Tag Heuer","WAZ1110","Formula 1",2014,null,"Ronda 705 (Quartz)",5,"cert_std_quartz"],
+    ["ref_oris_0173377074055","Oris","01 733 7707 4055","Aquis Date",2017,null,"SW200‑1 (Auto)",8,"cert_cosc_mech"],
+  ];
+
+  // ====== UTIL ======
+  const $ = (s)=>document.querySelector(s);
+  const show = (el, yes=true)=>el.classList.toggle("hidden", !yes);
+  const yearNow = new Date().getFullYear();
+  $("#yearNow").textContent = yearNow;
+
+  // ====== THEME ======
+  const themeBtn = $("#themeToggle");
+  const applyTheme = (t)=>{
+    document.body.setAttribute("data-theme", t);
+    themeBtn.textContent = t==="dark" ? "🌙" : "☀️";
+    localStorage.setItem("wc-theme", t);
+  };
+  applyTheme(localStorage.getItem("wc-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark":"light"));
+  themeBtn.addEventListener("click", ()=>applyTheme(document.body.getAttribute("data-theme")==="dark"?"light":"dark"));
+
+  // ====== TABS ======
+  document.querySelectorAll(".tab-btn").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      document.querySelectorAll(".tab-btn").forEach(b=>b.classList.remove("active"));
+      btn.classList.add("active");
+      const tab = btn.dataset.tab;
+      show($("#tab-check"), tab==="check");
+      show($("#tab-learn"), tab==="learn");
+    });
+  });
+
+  // ====== CONFETTI ======
+  const confettiCanvas = document.getElementById("confetti");
+  const ctx = confettiCanvas.getContext("2d");
+  const resize = ()=>{ confettiCanvas.width = innerWidth; confettiCanvas.height = innerHeight; };
+  window.addEventListener("resize", resize); resize();
+  let confettiParts = [];
+  function burstConfetti(){
+    const colors = ["#c8a96a","#facc15","#10b981","#60a5fa","#f472b6"];
+    const N = 120;
+    for(let i=0;i<N;i++){
+      confettiParts.push({
+        x: innerWidth/2, y: 20,
+        vx: (Math.random()-0.5)*6, vy: Math.random()*3+2,
+        g: 0.08+Math.random()*0.05,
+        size: Math.random()*6+3,
+        rot: Math.random()*Math.PI, vr: (Math.random()-0.5)*0.2,
+        color: colors[Math.floor(Math.random()*colors.length)],
+        life: 120+Math.random()*60
+      });
+    }
+  }
+  function tick(){
+    ctx.clearRect(0,0,confettiCanvas.width, confettiCanvas.height);
+    confettiParts = confettiParts.filter(p=>p.life>0);
+    confettiParts.forEach(p=>{
+      p.x+=p.vx; p.y+=p.vy; p.vy+=p.g; p.rot+=p.vr; p.life--;
+      ctx.save(); ctx.translate(p.x,p.y); ctx.rotate(p.rot);
+      ctx.fillStyle=p.color; ctx.fillRect(-p.size/2,-p.size/2,p.size,p.size);
+      ctx.restore();
+    });
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+
+  // ====== STATE & SEARCH ======
+  const state = { matches:[], guessIndex:0, chosen:null, madeYear:null };
+  function searchRefs(q){
+    if(!q) return [];
+    const s = String(q).trim().toLowerCase();
+    return REFERENCES.filter(r=> r[2].toLowerCase().includes(s));
+  }
+  function showGuess(){
+    const r = state.matches[state.guessIndex];
+    $("#guessText").textContent = `Do you have a ${r[1]} ${r[3]}?`;
+    $("#guessMeta").textContent = `Ref ${r[2]} • ${r[5]? r[4]+"–"+r[5] : r[4]+"–present"}`;
+  }
+  function resetFlow(){
+    state.matches=[]; state.guessIndex=0; state.chosen=null; state.madeYear=null;
+    $("#yearInput").value=""; $("#refInput").blur();
+    show($("#guessCard"), false); show($("#yearCard"), false); show($("#resultCard"), false);
+  }
+
+  // ====== FLOW ======
+  $("#startGuess").addEventListener("click", ()=>{
+    resetFlow();
+    const q = $("#refInput").value;
+    state.matches = searchRefs(q);
+    if(state.matches.length===0){
+      show($("#guessCard"), true);
+      $("#guessText").textContent = "Hmm… we couldn't find that reference.";
+      $("#guessMeta").textContent = "Try another code or check spacing/caps.";
+      $("#guessYes").classList.add("hidden");
+      $("#guessNo").textContent="OK";
+      return;
+    }
+    $("#guessYes").classList.remove("hidden");
+    $("#guessNo").textContent="No, try next";
+    show($("#guessCard"), true);
+    showGuess();
+  });
+
+  $("#guessNo").addEventListener("click", ()=>{
+    if(state.matches.length===0){ show($("#guessCard"), false); return; }
+    state.guessIndex++;
+    if(state.guessIndex>=state.matches.length){
+      $("#guessText").textContent = "No more matches for that reference.";
+      $("#guessMeta").textContent = "Try a different code — we’ll expand our database.";
+      $("#guessYes").classList.add("hidden"); $("#guessNo").textContent="OK";
+      return;
+    }
+    showGuess();
+  });
+
+  $("#guessYes").addEventListener("click", ()=>{
+    state.chosen = state.matches[state.guessIndex];
+    show($("#guessCard"), false);
+    show($("#yearCard"), true);
+    $("#yearInput").focus();
+  });
+
+  $("#yearNext").addEventListener("click", ()=>{
+    const y = parseInt($("#yearInput").value,10);
+    if(isNaN(y) || y<1900 || y>yearNow){ $("#yearInput").focus(); return; }
+    state.madeYear = y;
+    renderResult();
+  });
+
+  $("#clearAll").addEventListener("click", ()=>{
+    $("#refInput").value=""; resetFlow();
+  });
+
+  function renderResult(){
+    const r = state.chosen; if(!r) return;
+    const [id,brand,code,model,start,end,movement,svcYears,certId] = r;
+    const cert = CERTS[certId] || {name:"—", range:"—"};
+    const age = Math.max(0, yearNow - state.madeYear);
+    const interval = Number(svcYears)||8;
+    const needs = age >= interval;
+
+    $("#outModel").textContent = `${brand} ${model} (Ref ${code})`;
+    $("#outMovement").textContent = movement;
+    $("#outAge").textContent = `${age} year${age===1?"":"s"} (made ~${state.madeYear})`;
+    $("#outInterval").textContent = `${interval} years (typical)`;
+    $("#outCert").textContent = `${cert.name} • ${cert.range}`;
+
+    const badge = $("#resultBadge");
+    const title = $("#resultTitle");
+    const desc = $("#resultDesc");
+
+    if(needs){
+      badge.textContent="Needs check"; badge.className="badge bad";
+      title.textContent="Ouch — looks like it might be time for a service.";
+      desc.textContent="Based on the year you entered and typical intervals for this movement, it may be due. If accuracy or water‑resistance matters, contact a watchmaker.";
+    } else {
+      badge.textContent="Within range"; badge.className="badge good";
+      title.textContent="Nice! Your watch looks fine.";
+      desc.textContent="You’re within the usual service interval for this movement. Keep enjoying it!";
+      burstConfetti();
+    }
+
+    show($("#yearCard"), false);
+    show($("#resultCard"), true);
+    $("#resultCard").scrollIntoView({behavior:"smooth",block:"start"});
+  }
+</script>
+</body>
+</html>

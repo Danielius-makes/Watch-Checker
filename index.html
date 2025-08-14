@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Watch Checker</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --text: #111111;
+    --muted: #6b7280;
+    --card: #fafafa;
+    --border: #e5e7eb;
+    --accent: #c8a96a; /* soft gold */
+    --good: #10b981;
+    --bad: #ef4444;
+  }
+  [data-theme="dark"] {
+    --bg: #0d0d0d;
+    --text: #f9fafb;
+    --muted: #9ca3af;
+    --card: #161616;
+    --border: #262626;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg);color:var(--text);
+  }
+  .wrap{max-width:780px;margin:0 auto;padding:24px}
+  header{
+    display:flex;align-items:center;justify-content:space-between;margin:8px 0 24px 0
+  }
+  .brand{font-weight:700;letter-spacing:.2px}
+  .tabs{display:flex;gap:8px}
+  .tab-btn{
+    padding:10px 14px;border:1px solid var(--border);background:var(--card);
+    border-radius:12px;cursor:pointer;font-weight:600;color:var(--text)
+  }
+  .tab-btn.active{border-color:var(--accent)}
+  .theme-toggle{
+    border:1px solid var(--border);background:var(--card);padding:10px 12px;border-radius:12px;cursor:pointer
+  }
+  .card{
+    background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;margin:12px 0
+  }
+  .title{font-size:28px;font-weight:700;margin:4px 0 8px 0}
+  .subtitle{color:var(--muted);margin:0 0 12px 0}
+  label{display:block;font-weight:600;margin:12px 0 6px 0}
+  input[type="text"],input[type="number"]{
+    width:100%;padding:14px 16px;border:1px solid var(--border);
+    background:transparent;color:var(--text);border-radius:12px;font-size:16px
+  }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button{ -webkit-appearance: none; margin: 0; }
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .btn{
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    height:44px;padding:0 16px;border-radius:12px;border:1px solid var(--border);
+    background:var(--accent);color:white;font-weight:700;cursor:pointer
+  }
+  .btn.ghost{background:transparent;color:var(--text)}
+  .result{
+    display:flex;align-items:center;gap:12px;font-weight:700
+  }
+  .badge{
+    display:inline-block;padding:8px 12px;border-radius:999px;border:1px solid var(--border);
+    background:var(--card);font-weight:700
+  }
+  .badge.good{border-color:rgba(16,185,129,.35);color:var(--good)}
+  .badge.bad{border-color:rgba(239,68,68,.35);color:var(--bad)}
+  .list{display:grid;gap:10px}
+  .list .item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px dashed var(--border)}
+  .muted{color:var(--muted)}
+  .hidden{display:none}
+  footer{margin:24px 0;color:var(--muted);font-size:14px;text-align:center}
+  canvas#confetti{position:fixed;inset:0;pointer-events:none}
+</style>
+</head>
+<body data-theme="light">
+<canvas id="confetti"></canvas>
+<div class="wrap">
+  <header>
+    <div class="brand">Watch Checker</div>
+    <div class="row">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="check">Check</button>
+        <button class="tab-btn" data-tab="learn">Learn</button>
+      </div>
+      <button id="themeToggle" class="theme-toggle" title="Toggle theme">☀️</button>
+    </div>
+  </header>
+
+  <!-- CHECK TAB -->
+  <section id="tab-check">
+    <div class="card">
+      <div class="title">Enter your reference</div>
+      <p class="subtitle">Type your watch reference number and we’ll guess the brand & model.</p>
+      <label for="refInput">Reference number</label>
+      <input id="refInput" type="text" placeholder="e.g., 16220" autocomplete="off" />
+      <div class="row" style="margin-top:12px">
+        <button id="startGuess" class="btn">Check my watch</button>
+        <button id="clearAll" class="btn ghost">Clear</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- LEARN TAB -->
+  <section id="tab-learn" class="hidden">
+    <div class="card">
+      <div class="title">Movement types — quick guide</div>
+      <div class="list">
+        <div class="item"><span><strong>Manual</strong></span><span class="muted">Hand-wound; typical tolerance varies, ~±10–30 s/day.</span></div>
+        <div class="item"><span><strong>Automatic</strong></span><span class="muted">Self-winding mechanical; common spec ~±10–20 s/day unless certified.</span></div>
+        <div class="item"><span><strong>Quartz</strong></span><span class="muted">Battery; ~±15 s/month (≈±0.5 s/day).</span></div>
+        <div class="item"><span><strong>Superquartz / HAQ</strong></span><span class="muted">Thermo‑compensated; ~±3–10 s/year.</span></div>
+        <div class="item"><span><strong>Spring Drive</strong></span><span class="muted">Hybrid GS tech; ~±15 s/month (≈±0.5 s/day).</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title">Certifications — what “within range” means</div>
+      <div class="list">
+        <div class="item"><span><strong>COSC (Mech)</strong></span><span class="muted">~−4 to +6 s/day (lab conditions).</span></div>
+        <div class="item"><span><strong>METAS / Master Chronometer</strong></span><span class="muted">As‑worn average near 0 s/day (small + allowed).</span></div>
+        <div class="item"><span><strong>Rolex Superlative</strong></span><span class="muted">~−2 to +2 s/day (post‑COSC adjustment).</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title">Why service matters</div>
+      <p class="subtitle">
+        Oils dry, seals age, parts wear. Regular service keeps accuracy, water‑resistance, and longevity in check.
+        If your watch is past its typical service interval or behaving oddly (big daily gains/losses, low power reserve, magnetized),
+        have a watchmaker inspect it.
+      </p>
+    </div>
+  </section>
+
+  <footer>© <span id="yearNow"></span> Watch Checker • Pure & minimal</footer>
+</div>
+
+<script>
+document.getElementById("yearNow").textContent = new Date().getFullYear();
+</script>
+
+</body>
+</html>
